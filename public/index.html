@@ -6,36 +6,16 @@
   <title>オンラインじゃんけん</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       font-family: 'Segoe UI', 'Hiragino Sans', sans-serif;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
       min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: flex; align-items: center; justify-content: center;
       color: #fff;
     }
-
-    .container {
-      width: 100%;
-      max-width: 480px;
-      padding: 20px;
-    }
-
-    h1 {
-      text-align: center;
-      font-size: 2rem;
-      margin-bottom: 8px;
-      text-shadow: 0 0 20px rgba(100, 200, 255, 0.5);
-    }
-
-    .subtitle {
-      text-align: center;
-      color: #aaa;
-      margin-bottom: 32px;
-      font-size: 0.9rem;
-    }
+    .container { width: 100%; max-width: 480px; padding: 16px; }
+    h1 { text-align: center; font-size: 2rem; margin-bottom: 4px; }
+    .subtitle { text-align: center; color: #aaa; font-size: 0.85rem; margin-bottom: 24px; }
 
     .screen { display: none; }
     .screen.active { display: block; }
@@ -43,462 +23,480 @@
     .card {
       background: rgba(255,255,255,0.07);
       border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 16px;
-      padding: 28px;
-      margin-bottom: 16px;
+      border-radius: 16px; padding: 20px; margin-bottom: 12px;
       backdrop-filter: blur(10px);
     }
-
-    .card h2 {
-      font-size: 1.1rem;
-      margin-bottom: 16px;
-      color: #7ec8e3;
-    }
+    .card-title { font-size: 0.8rem; color: #7ec8e3; font-weight: 600; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
 
     input[type="text"] {
-      width: 100%;
-      padding: 12px 16px;
-      border-radius: 10px;
+      width: 100%; padding: 12px 16px; border-radius: 10px;
       border: 1px solid rgba(255,255,255,0.2);
-      background: rgba(255,255,255,0.1);
-      color: #fff;
-      font-size: 1rem;
-      margin-bottom: 12px;
-      outline: none;
-      transition: border-color 0.2s;
+      background: rgba(255,255,255,0.1); color: #fff;
+      font-size: 1rem; margin-bottom: 10px; outline: none; transition: border-color 0.2s;
+    }
+    input::placeholder { color: #555; }
+    input:focus { border-color: #7ec8e3; }
+
+    button { padding: 12px 20px; border-radius: 10px; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.18s; }
+    .btn-full { width: 100%; }
+    .btn-primary { background: linear-gradient(135deg, #4776e6, #8e54e9); color: #fff; }
+    .btn-primary:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .btn-ghost { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
+    .btn-ghost:hover { background: rgba(255,255,255,0.16); }
+    .btn-danger { background: rgba(248,113,113,0.2); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
+    .btn-danger:hover { background: rgba(248,113,113,0.3); }
+    .error-msg { color: #f87171; font-size: 0.85rem; min-height: 18px; margin-top: 6px; }
+
+    /* ── LOBBY ── */
+    .room-id-big {
+      text-align: center; font-size: 2.8rem; font-weight: 900; letter-spacing: 0.3em;
+      color: #7ec8e3; padding: 14px; background: rgba(126,200,227,0.1);
+      border-radius: 12px; margin-bottom: 6px; cursor: pointer; user-select: none;
+    }
+    .room-id-big:hover { background: rgba(126,200,227,0.18); }
+    .copy-hint { text-align: center; color: #555; font-size: 0.8rem; margin-bottom: 16px; }
+    .player-list { list-style: none; }
+    .player-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,0.05); margin-bottom: 6px; }
+    .player-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #4776e6, #8e54e9); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.95rem; flex-shrink: 0; }
+    .player-name { flex: 1; font-size: 0.95rem; }
+    .player-name.me { color: #7ec8e3; }
+    .host-badge { font-size: 0.75rem; background: rgba(250,204,21,0.2); color: #facc15; padding: 2px 8px; border-radius: 20px; }
+    .player-score { font-size: 1rem; font-weight: 700; min-width: 28px; text-align: right; }
+    .player-status { font-size: 1rem; }
+    .status-chosen { color: #4ade80; }
+    .status-waiting { color: #555; }
+    .lobby-hint { text-align: center; color: #666; font-size: 0.85rem; margin: 8px 0; }
+
+    /* ── GAME ── */
+    .notice-toast {
+      position: fixed; top: 20px; left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      background: rgba(20,20,40,0.95); border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 40px; padding: 10px 22px; font-size: 0.9rem;
+      white-space: nowrap; transition: transform 0.3s ease; z-index: 100;
+    }
+    .notice-toast.show { transform: translateX(-50%) translateY(0); }
+
+    .game-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .round-badge { background: rgba(255,255,255,0.1); border-radius: 20px; padding: 6px 16px; font-size: 0.9rem; font-weight: 600; }
+
+    /* ── COUNTDOWN ── */
+    #phase-countdown {
+      text-align: center; padding: 40px 20px; min-height: 200px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    #janken-text { font-size: 3rem; font-weight: 900; letter-spacing: 0.08em; }
+    #pon-text {
+      font-size: 5.5rem; font-weight: 900; color: #facc15; display: none;
+      text-shadow: 0 0 40px rgba(250,204,21,0.7), 0 0 80px rgba(250,204,21,0.3);
+    }
+    @keyframes jankenIn {
+      from { opacity: 0; transform: scale(0.4) translateY(-20px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    @keyframes jankenPulse {
+      0%,100% { transform: scale(1); }
+      50%     { transform: scale(1.1); }
+    }
+    @keyframes ponFlash {
+      0%  { opacity: 0; transform: scale(0.2); }
+      55% { transform: scale(1.35); }
+      100%{ opacity: 1; transform: scale(1); }
     }
 
-    input[type="text"]::placeholder { color: #888; }
-    input[type="text"]:focus { border-color: #7ec8e3; }
-
-    button {
-      width: 100%;
-      padding: 13px;
-      border-radius: 10px;
-      border: none;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #4776e6, #8e54e9);
-      color: #fff;
-    }
-
-    .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
-    .btn-primary:active { transform: translateY(0); }
-
-    .btn-secondary {
-      background: rgba(255,255,255,0.1);
-      color: #fff;
-      border: 1px solid rgba(255,255,255,0.2);
-      margin-top: 8px;
-    }
-
-    .btn-secondary:hover { background: rgba(255,255,255,0.15); }
-
-    .error-msg {
-      color: #ff7eb3;
-      font-size: 0.85rem;
-      margin-top: 8px;
-      min-height: 20px;
-    }
-
-    /* 待機画面 */
-    .room-id-display {
-      text-align: center;
-      font-size: 2.5rem;
-      font-weight: 700;
-      letter-spacing: 0.3em;
-      color: #7ec8e3;
-      padding: 20px;
-      background: rgba(126, 200, 227, 0.1);
-      border-radius: 12px;
-      margin: 16px 0;
-    }
-
-    .waiting-text {
-      text-align: center;
-      color: #aaa;
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
-
-    /* ゲーム画面 */
-    .scoreboard {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-    }
-
-    .player-score {
-      text-align: center;
-      flex: 1;
-    }
-
-    .player-score .pname {
-      font-size: 0.9rem;
-      color: #aaa;
-      margin-bottom: 4px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .player-score.me .pname { color: #7ec8e3; }
-
-    .score-num {
-      font-size: 2.2rem;
-      font-weight: 700;
-    }
-
-    .vs-badge {
-      padding: 0 16px;
-      font-size: 1.2rem;
-      color: #555;
-      font-weight: 700;
-    }
-
-    .round-label {
-      text-align: center;
-      color: #888;
-      font-size: 0.85rem;
-      margin-bottom: 20px;
-    }
-
-    /* 手の選択エリア */
-    .choices {
-      display: flex;
-      justify-content: center;
-      gap: 16px;
-      margin: 20px 0;
-    }
-
+    /* ── CHOOSING ── */
+    #phase-choosing { text-align: center; padding: 16px 0; }
+    .choose-hint { color: #aaa; font-size: 0.9rem; margin-bottom: 4px; }
+    .choices { display: flex; justify-content: center; gap: 12px; margin: 16px 0; }
     .choice-btn {
-      width: 90px;
-      height: 90px;
-      border-radius: 50%;
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      width: 90px; height: 100px; border-radius: 16px;
       border: 2px solid rgba(255,255,255,0.15);
       background: rgba(255,255,255,0.07);
-      font-size: 2.4rem;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      color: #fff; font-size: 2.4rem; cursor: pointer; transition: all 0.18s;
     }
+    .choice-btn span { font-size: 0.75rem; }
+    .choice-btn:hover:not(:disabled) { border-color: #7ec8e3; background: rgba(126,200,227,0.15); transform: scale(1.1); }
+    .choice-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .choice-btn.selected { border-color: #7ec8e3; background: rgba(126,200,227,0.25); }
+    .timer-wrap { height: 4px; background: rgba(255,255,255,0.1); border-radius: 4px; margin: 8px 0 0; overflow: hidden; }
+    #timer-fill { height: 100%; background: linear-gradient(90deg, #4776e6, #7ec8e3); border-radius: 4px; width: 100%; }
 
-    .choice-btn:hover:not(:disabled) {
-      border-color: #7ec8e3;
-      background: rgba(126, 200, 227, 0.15);
-      transform: scale(1.1);
-    }
-
-    .choice-btn:disabled {
-      cursor: default;
-      opacity: 0.5;
-    }
-
-    .choice-btn.selected {
-      border-color: #7ec8e3;
-      background: rgba(126, 200, 227, 0.25);
-      transform: scale(1.05);
-    }
-
-    /* 結果表示 */
-    .result-area {
-      text-align: center;
-      padding: 20px 0;
-    }
-
-    .result-hands {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 24px;
-      font-size: 3.5rem;
-      margin-bottom: 16px;
-    }
-
-    .result-hand { transition: transform 0.3s; }
-    .result-hand.winner { transform: scale(1.2); }
-
+    /* ── RESULT ── */
+    #phase-result { padding: 8px 0; }
     .result-verdict {
-      font-size: 1.8rem;
-      font-weight: 700;
-      margin-bottom: 8px;
+      text-align: center; font-size: 1.4rem; font-weight: 700;
+      margin-bottom: 16px; padding: 10px; border-radius: 12px;
     }
-
-    .result-verdict.win { color: #4ade80; }
-    .result-verdict.lose { color: #f87171; }
-    .result-verdict.draw { color: #facc15; }
-
-    .status-msg {
-      text-align: center;
-      color: #aaa;
-      font-size: 0.9rem;
-      margin: 12px 0;
-      min-height: 22px;
+    .verdict-win  { color: #4ade80; background: rgba(74,222,128,0.1); }
+    .verdict-lose { color: #f87171; background: rgba(248,113,113,0.1); }
+    .verdict-draw { color: #facc15; background: rgba(250,204,21,0.1); }
+    .result-players { list-style: none; margin-bottom: 14px; }
+    .result-player {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 10px; margin-bottom: 6px;
+      background: rgba(255,255,255,0.05); border: 1px solid transparent;
     }
-
-    .divider {
-      border: none;
-      border-top: 1px solid rgba(255,255,255,0.08);
-      margin: 16px 0;
-    }
+    .result-player.winner { background: rgba(74,222,128,0.1); border-color: rgba(74,222,128,0.25); }
+    .result-hand { font-size: 1.8rem; }
+    .result-pname { flex: 1; font-size: 0.95rem; }
+    .result-score { font-size: 0.85rem; color: #aaa; margin-right: 4px; }
+    .result-badge { font-size: 0.8rem; padding: 3px 10px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+    .badge-win  { background: rgba(74,222,128,0.2);  color: #4ade80; }
+    .badge-lose { background: rgba(248,113,113,0.2); color: #f87171; }
+    .badge-draw { background: rgba(250,204,21,0.2);  color: #facc15; }
+    .waiting-host-msg { text-align: center; color: #666; font-size: 0.85rem; margin-top: 8px; }
   </style>
 </head>
 <body>
+<div id="notice-toast" class="notice-toast"></div>
 <div class="container">
   <h1>✊ じゃんけん</h1>
-  <p class="subtitle">オンライン対戦</p>
+  <p class="subtitle">オンライン多人数対戦（最大8人）</p>
 
-  <!-- トップ画面 -->
+  <!-- TOP -->
   <div id="screen-top" class="screen active">
     <div class="card">
-      <h2>名前を入力</h2>
-      <input type="text" id="input-name" placeholder="あなたの名前" maxlength="12">
+      <div class="card-title">プレイヤー名</div>
+      <input type="text" id="input-name" placeholder="名前を入力" maxlength="12">
     </div>
     <div class="card">
-      <h2>ルームを作る</h2>
-      <button class="btn-primary" onclick="createRoom()">ルームを作成する</button>
+      <div class="card-title">ルームを作る</div>
+      <button class="btn-primary btn-full" onclick="createRoom()">ルームを作成する</button>
     </div>
     <div class="card">
-      <h2>ルームに参加</h2>
-      <input type="text" id="input-room" placeholder="ルームID（例: AB12C）" maxlength="5">
-      <button class="btn-primary" onclick="joinRoom()">参加する</button>
+      <div class="card-title">ルームに参加</div>
+      <input type="text" id="input-room-id" placeholder="ルームID（例: AB12C）" maxlength="5" style="text-transform:uppercase">
+      <button class="btn-primary btn-full" onclick="joinRoom()">参加する</button>
     </div>
     <p class="error-msg" id="top-error"></p>
   </div>
 
-  <!-- 待機画面 -->
-  <div id="screen-waiting" class="screen">
-    <div class="card" style="text-align:center">
-      <h2>ルームID</h2>
-      <div class="room-id-display" id="display-room-id">-----</div>
-      <p style="color:#aaa;font-size:0.85rem;margin-bottom:16px">
-        このIDを相手に教えてください
-      </p>
-      <p class="waiting-text">相手の参加を待っています…</p>
+  <!-- LOBBY -->
+  <div id="screen-lobby" class="screen">
+    <div class="card">
+      <div class="card-title">ルームID（タップでコピー）</div>
+      <div class="room-id-big" id="lobby-room-id" onclick="copyRoomId()">-----</div>
+      <p class="copy-hint" id="copy-hint">タップしてコピー</p>
     </div>
+    <div class="card">
+      <div class="card-title">参加中のプレイヤー</div>
+      <ul class="player-list" id="lobby-player-list"></ul>
+      <p class="lobby-hint" id="lobby-hint">2人以上でゲームを開始できます</p>
+    </div>
+    <button id="btn-start" class="btn-primary btn-full" onclick="startGame()" style="margin-bottom:10px;display:none">ゲーム開始</button>
+    <button class="btn-danger btn-full" onclick="leaveRoom()">退出する</button>
   </div>
 
-  <!-- ゲーム画面 -->
+  <!-- GAME -->
   <div id="screen-game" class="screen">
-    <div class="card">
-      <div class="scoreboard">
-        <div class="player-score me">
-          <div class="pname" id="my-name">あなた</div>
-          <div class="score-num" id="my-score">0</div>
-        </div>
-        <div class="vs-badge">VS</div>
-        <div class="player-score">
-          <div class="pname" id="opp-name">相手</div>
-          <div class="score-num" id="opp-score">0</div>
-        </div>
-      </div>
+    <div class="game-header">
+      <div class="round-badge" id="game-round">第1ラウンド</div>
+      <button class="btn-danger" onclick="leaveRoom()" style="padding:8px 14px;font-size:0.85rem">退出</button>
+    </div>
 
-      <div class="round-label" id="round-label">第1ラウンド</div>
-      <hr class="divider">
+    <div class="card" style="padding:12px 16px;margin-bottom:12px">
+      <ul class="player-list" id="game-player-list"></ul>
+    </div>
 
-      <!-- 選択フェーズ -->
-      <div id="phase-choose">
-        <p class="status-msg">手を選んでください</p>
-        <div class="choices">
-          <button class="choice-btn" onclick="choose('rock')" title="グー">✊</button>
-          <button class="choice-btn" onclick="choose('scissors')" title="チョキ">✌️</button>
-          <button class="choice-btn" onclick="choose('paper')" title="パー">✋</button>
-        </div>
-        <p class="status-msg" id="choose-status"></p>
-      </div>
+    <!-- Countdown -->
+    <div class="card" id="phase-countdown" style="display:none">
+      <div id="janken-text">じゃんけん...</div>
+      <div id="pon-text">ポン！</div>
+    </div>
 
-      <!-- 結果フェーズ -->
-      <div id="phase-result" style="display:none">
-        <div class="result-area">
-          <div class="result-hands">
-            <span class="result-hand" id="result-my-hand">✊</span>
-            <span style="font-size:1.5rem;color:#555">VS</span>
-            <span class="result-hand" id="result-opp-hand">✊</span>
-          </div>
-          <div class="result-verdict" id="result-verdict">あいこ</div>
-        </div>
-        <button class="btn-primary" id="btn-next" onclick="nextRound()" style="display:none">
-          次のラウンドへ →
-        </button>
+    <!-- Choosing -->
+    <div class="card" id="phase-choosing" style="display:none">
+      <p class="choose-hint">手を選んでください</p>
+      <div class="choices">
+        <button class="choice-btn" onclick="choose('rock')">✊<span>グー</span></button>
+        <button class="choice-btn" onclick="choose('scissors')">✌️<span>チョキ</span></button>
+        <button class="choice-btn" onclick="choose('paper')">✋<span>パー</span></button>
       </div>
+      <div class="timer-wrap"><div id="timer-fill"></div></div>
+    </div>
+
+    <!-- Result -->
+    <div class="card" id="phase-result" style="display:none">
+      <div class="result-verdict" id="result-verdict"></div>
+      <ul class="result-players" id="result-player-list"></ul>
+      <button id="btn-next-round" class="btn-primary btn-full" onclick="nextRound()" style="display:none">次のラウンドへ →</button>
+      <p class="waiting-host-msg" id="waiting-host" style="display:none">ホストが次のラウンドを開始するのを待っています...</p>
     </div>
   </div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-  const socket = io();
-  let myRoomId = null;
-  let myIndex = null;  // 0 or 1
-  let myId = null;
-  let oppId = null;
-  let playerNames = [];
-  let currentRound = 1;
-  let myChoice = null;
-  let readyForNext = false;
+const socket = io();
+let myId = null;
+let myRoomId = null;
+let currentSnap = null;
+let ponTimeout = null;
 
-  const HAND_EMOJI = { rock: '✊', scissors: '✌️', paper: '✋' };
-  const HAND_LABEL = { rock: 'グー', scissors: 'チョキ', paper: 'パー' };
+const HAND = { rock: '✊', scissors: '✌️', paper: '✋' };
 
-  function showScreen(id) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-  }
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
 
-  function getName() {
-    const v = document.getElementById('input-name').value.trim();
-    if (!v) { showError('名前を入力してください'); return null; }
-    return v;
-  }
-
-  function showError(msg) {
-    document.getElementById('top-error').textContent = msg;
-  }
-
-  function createRoom() {
-    const name = getName();
-    if (!name) return;
-    socket.emit('create_room', { name });
-  }
-
-  function joinRoom() {
-    const name = getName();
-    if (!name) return;
-    const roomId = document.getElementById('input-room').value.trim().toUpperCase();
-    if (!roomId) { showError('ルームIDを入力してください'); return; }
-    socket.emit('join_room', { roomId, name });
-  }
-
-  function choose(hand) {
-    if (myChoice) return;
-    myChoice = hand;
-
-    document.querySelectorAll('.choice-btn').forEach(b => {
-      b.disabled = true;
-      if (b.title === HAND_LABEL[hand]) b.classList.add('selected');
-    });
-    document.getElementById('choose-status').textContent = `${HAND_EMOJI[hand]} ${HAND_LABEL[hand]}を選択しました。相手を待っています…`;
-
-    socket.emit('choose', { roomId: myRoomId, choice: hand });
-  }
-
-  function nextRound() {
-    readyForNext = true;
-    document.getElementById('btn-next').textContent = '待機中…';
-    document.getElementById('btn-next').disabled = true;
-    socket.emit('next_round', { roomId: myRoomId });
-  }
-
-  function startRound(round) {
-    currentRound = round;
-    myChoice = null;
-    readyForNext = false;
-
-    document.getElementById('round-label').textContent = `第${round}ラウンド`;
-    document.getElementById('phase-choose').style.display = 'block';
-    document.getElementById('phase-result').style.display = 'none';
-    document.getElementById('choose-status').textContent = '';
-
-    document.querySelectorAll('.choice-btn').forEach(b => {
-      b.disabled = false;
-      b.classList.remove('selected');
-    });
-
-    document.getElementById('btn-next').style.display = 'none';
-    document.getElementById('btn-next').disabled = false;
-    document.getElementById('btn-next').textContent = '次のラウンドへ →';
-  }
-
-  // --- Socket events ---
-
-  socket.on('room_created', ({ roomId, playerIndex }) => {
-    myRoomId = roomId;
-    myIndex = playerIndex;
-    myId = socket.id;
-    document.getElementById('display-room-id').textContent = roomId;
-    showScreen('screen-waiting');
+function showGamePhase(phase) {
+  ['phase-countdown','phase-choosing','phase-result'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
   });
+  if (phase) document.getElementById('phase-' + phase).style.display = 'block';
+}
 
-  socket.on('room_joined', ({ roomId, playerIndex }) => {
-    myRoomId = roomId;
-    myIndex = playerIndex;
-    myId = socket.id;
+function showNotice(msg) {
+  const el = document.getElementById('notice-toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function getName() {
+  const v = document.getElementById('input-name').value.trim();
+  if (!v) { document.getElementById('top-error').textContent = '名前を入力してください'; return null; }
+  return v;
+}
+
+function initial(name) { return name.charAt(0).toUpperCase(); }
+function amHost() { return currentSnap && myId === currentSnap.hostId; }
+
+// ── Player list renderers ──
+function renderLobbyPlayers(snap) {
+  const ul = document.getElementById('lobby-player-list');
+  ul.innerHTML = '';
+  snap.players.forEach(p => {
+    const li = document.createElement('li');
+    li.className = 'player-item';
+    li.innerHTML = `
+      <div class="player-avatar">${initial(p.name)}</div>
+      <div class="player-name${p.id === myId ? ' me' : ''}">${p.name}${p.id === myId ? ' (あなた)' : ''}</div>
+      ${p.id === snap.hostId ? '<span class="host-badge">👑 ホスト</span>' : ''}
+    `;
+    ul.appendChild(li);
   });
+  const startBtn = document.getElementById('btn-start');
+  startBtn.style.display = amHost() ? 'block' : 'none';
+  startBtn.disabled = snap.players.length < 2;
+  document.getElementById('lobby-hint').style.display = snap.players.length < 2 ? 'block' : 'none';
+}
 
-  socket.on('game_start', ({ names, round }) => {
-    playerNames = names;
-    document.getElementById('my-name').textContent = names[myIndex] + ' (あなた)';
-    document.getElementById('opp-name').textContent = names[1 - myIndex];
-    document.getElementById('my-score').textContent = '0';
-    document.getElementById('opp-score').textContent = '0';
-    showScreen('screen-game');
-    startRound(round);
-  });
-
-  socket.on('opponent_chose', () => {
-    if (!myChoice) {
-      document.getElementById('choose-status').textContent = '相手が選択しました。あなたも選んでください。';
+function renderGamePlayers(snap) {
+  const ul = document.getElementById('game-player-list');
+  ul.innerHTML = '';
+  snap.players.forEach(p => {
+    const li = document.createElement('li');
+    li.className = 'player-item';
+    let statusHtml = '';
+    if (snap.state === 'choosing') {
+      statusHtml = p.hasChosen
+        ? '<span class="player-status status-chosen">✓</span>'
+        : '<span class="player-status status-waiting">⏳</span>';
     }
+    li.innerHTML = `
+      <div class="player-avatar">${initial(p.name)}</div>
+      <div class="player-name${p.id === myId ? ' me' : ''}">${p.name}${p.id === snap.hostId ? ' 👑' : ''}</div>
+      <div class="player-score">★${p.score}</div>
+      ${statusHtml}
+    `;
+    ul.appendChild(li);
+  });
+  document.getElementById('game-round').textContent = `第${snap.round}ラウンド`;
+}
+
+// ── Timer ──
+function startTimer(ms) {
+  const fill = document.getElementById('timer-fill');
+  fill.style.transition = 'none';
+  fill.style.width = '100%';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    fill.style.transition = `width ${ms}ms linear`;
+    fill.style.width = '0%';
+  }));
+}
+function stopTimer() {
+  const fill = document.getElementById('timer-fill');
+  fill.style.transition = 'none';
+  fill.style.width = '0%';
+}
+
+// ── Countdown animation ──
+function playCountdown() {
+  clearTimeout(ponTimeout);
+  const janken = document.getElementById('janken-text');
+  const pon = document.getElementById('pon-text');
+  janken.style.display = 'block';
+  pon.style.display = 'none';
+  janken.style.animation = 'none';
+  void janken.offsetWidth;
+  janken.style.animation = 'jankenIn 0.4s ease forwards';
+  setTimeout(() => { janken.style.animation = 'jankenPulse 0.4s ease infinite'; }, 500);
+  // ポン！ at 2.2s（サーバーが3.5sでphase_chooseを送る）
+  ponTimeout = setTimeout(() => {
+    janken.style.display = 'none';
+    pon.style.display = 'block';
+    pon.style.animation = 'none';
+    void pon.offsetWidth;
+    pon.style.animation = 'ponFlash 0.6s ease forwards';
+  }, 2200);
+}
+
+// ── Actions ──
+function createRoom() {
+  const name = getName();
+  if (!name) return;
+  socket.emit('create_room', { name });
+}
+
+function joinRoom() {
+  const name = getName();
+  if (!name) return;
+  const roomId = document.getElementById('input-room-id').value.trim().toUpperCase();
+  if (!roomId) { document.getElementById('top-error').textContent = 'ルームIDを入力してください'; return; }
+  socket.emit('join_room', { roomId, name });
+}
+
+function startGame() { socket.emit('start_game'); }
+
+function choose(hand) {
+  socket.emit('choose', { hand });
+  document.querySelectorAll('.choice-btn').forEach(b => { b.disabled = true; });
+  const labels = { rock: 'グー', scissors: 'チョキ', paper: 'パー' };
+  document.querySelectorAll('.choice-btn').forEach(b => {
+    if (b.querySelector('span').textContent === labels[hand]) b.classList.add('selected');
+  });
+}
+
+function nextRound() { socket.emit('next_round'); }
+
+function leaveRoom() {
+  socket.emit('leave_room');
+  myRoomId = null; currentSnap = null;
+  clearTimeout(ponTimeout); stopTimer();
+  showScreen('screen-top');
+}
+
+function copyRoomId() {
+  if (!myRoomId) return;
+  navigator.clipboard.writeText(myRoomId).then(() => {
+    document.getElementById('copy-hint').textContent = 'コピーしました！';
+    setTimeout(() => { document.getElementById('copy-hint').textContent = 'タップしてコピー'; }, 2000);
+  });
+}
+
+// ── Socket events ──
+socket.on('connect', () => { myId = socket.id; });
+
+socket.on('room_created', ({ roomId }) => {
+  myRoomId = roomId;
+  document.getElementById('lobby-room-id').textContent = roomId;
+  showScreen('screen-lobby');
+});
+
+socket.on('room_joined', ({ roomId }) => {
+  myRoomId = roomId;
+  document.getElementById('lobby-room-id').textContent = roomId;
+  showScreen('screen-lobby');
+});
+
+socket.on('room_update', (snap) => {
+  currentSnap = snap;
+  if (snap.state === 'lobby') {
+    showScreen('screen-lobby');
+    renderLobbyPlayers(snap);
+    stopTimer(); clearTimeout(ponTimeout);
+    showGamePhase(null);
+  } else {
+    renderGamePlayers(snap);
+    // ホストが変わった場合に次ラウンドボタンを更新
+    if (snap.state === 'result') {
+      document.getElementById('btn-next-round').style.display = amHost() ? 'block' : 'none';
+      document.getElementById('waiting-host').style.display = amHost() ? 'none' : 'block';
+    }
+  }
+});
+
+socket.on('phase_countdown', ({ snap }) => {
+  currentSnap = snap;
+  stopTimer();
+  showScreen('screen-game');
+  showGamePhase('countdown');
+  renderGamePlayers(snap);
+  playCountdown();
+});
+
+socket.on('phase_choose', ({ snap }) => {
+  currentSnap = snap;
+  renderGamePlayers(snap);
+  // ポン！を少し見せてからボタン表示
+  setTimeout(() => {
+    showGamePhase('choosing');
+    document.querySelectorAll('.choice-btn').forEach(b => {
+      b.disabled = false; b.classList.remove('selected');
+    });
+    startTimer(15000);
+  }, 700);
+});
+
+socket.on('phase_result', ({ choices, result, snap }) => {
+  currentSnap = snap;
+  stopTimer();
+  showGamePhase('result');
+  renderGamePlayers(snap);
+
+  // 自分の結果判定
+  const verdictEl = document.getElementById('result-verdict');
+  if (result.draw) {
+    verdictEl.textContent = 'あいこ！';
+    verdictEl.className = 'result-verdict verdict-draw';
+  } else if (result.winners.includes(myId)) {
+    verdictEl.textContent = '🎉 勝ち！';
+    verdictEl.className = 'result-verdict verdict-win';
+  } else if (choices[myId]) {
+    verdictEl.textContent = '負け…';
+    verdictEl.className = 'result-verdict verdict-lose';
+  } else {
+    verdictEl.textContent = result.draw ? 'あいこ！' : '結果';
+    verdictEl.className = 'result-verdict verdict-draw';
+  }
+
+  // 全プレイヤーの手を表示
+  const ul = document.getElementById('result-player-list');
+  ul.innerHTML = '';
+  snap.players.forEach(p => {
+    const hand = choices[p.id];
+    if (!hand) return;
+    const isWinner = !result.draw && result.winners.includes(p.id);
+    const li = document.createElement('li');
+    li.className = 'result-player' + (isWinner ? ' winner' : '');
+    const badge = result.draw
+      ? '<span class="result-badge badge-draw">あいこ</span>'
+      : isWinner
+        ? '<span class="result-badge badge-win">勝ち！</span>'
+        : '<span class="result-badge badge-lose">負け</span>';
+    li.innerHTML = `
+      <span class="result-hand">${HAND[hand]}</span>
+      <span class="result-pname">${p.name}${p.id === myId ? ' (あなた)' : ''}</span>
+      <span class="result-score">★${p.score}</span>
+      ${badge}
+    `;
+    ul.appendChild(li);
   });
 
-  socket.on('round_result', ({ choices, results, scores, round }) => {
-    // IDを特定（room_joined前にgame_startが来るので socket.id使用）
-    const ids = Object.keys(choices);
-    myId = myId || ids[myIndex];
-    oppId = ids.find(id => id !== myId);
+  document.getElementById('btn-next-round').style.display = amHost() ? 'block' : 'none';
+  document.getElementById('waiting-host').style.display = amHost() ? 'none' : 'block';
+});
 
-    const myHand = choices[myId];
-    const oppHand = choices[oppId];
-    const myResult = results[myId];
+socket.on('notice', (msg) => showNotice(msg));
+socket.on('join_error', (msg) => { document.getElementById('top-error').textContent = msg; });
 
-    document.getElementById('result-my-hand').textContent = HAND_EMOJI[myHand];
-    document.getElementById('result-opp-hand').textContent = HAND_EMOJI[oppHand];
-
-    const verdictEl = document.getElementById('result-verdict');
-    verdictEl.className = 'result-verdict ' + myResult;
-    verdictEl.textContent = myResult === 'win' ? '勝ち！' : myResult === 'lose' ? '負け…' : 'あいこ';
-
-    // スコア更新
-    document.getElementById('my-score').textContent = scores[myId] ?? 0;
-    document.getElementById('opp-score').textContent = scores[oppId] ?? 0;
-
-    document.getElementById('phase-choose').style.display = 'none';
-    document.getElementById('phase-result').style.display = 'block';
-    document.getElementById('btn-next').style.display = 'block';
-  });
-
-  socket.on('round_start', ({ round }) => {
-    startRound(round);
-  });
-
-  socket.on('opponent_left', () => {
-    alert('相手が退出しました。');
-    location.reload();
-  });
-
-  socket.on('error', ({ message }) => {
-    showError(message);
-  });
-
-  // Enterキーでルーム参加
-  document.getElementById('input-room').addEventListener('keydown', e => {
-    if (e.key === 'Enter') joinRoom();
-  });
-  document.getElementById('input-name').addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('input-room').focus();
-  });
+document.getElementById('input-room-id').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(); });
+document.getElementById('input-name').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('input-room-id').focus(); });
 </script>
 </body>
 </html>

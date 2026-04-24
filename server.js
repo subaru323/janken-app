@@ -6,114 +6,141 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-
 app.use(express.static(path.join(__dirname, 'public')));
 
-// rooms: { roomId: { players: [{ id, name, choice }], round, scores } }
-const rooms = {};
+const rooms = new Map();
+const genId = () => Math.random().toString(36).substring(2, 7).toUpperCase();
 
-function generateRoomId() {
-  return Math.random().toString(36).substring(2, 7).toUpperCase();
+function judge(choices) {
+  const hands = [...new Set(Object.values(choices))];
+  if (hands.length !== 2) return { draw: true, winners: [], losers: [] };
+  const beats = { rock: 'scissors', scissors: 'paper', paper: 'rock' };
+  const [a, b] = hands;
+  const winHand = beats[a] === b ? a : b;
+  const entries = Object.entries(choices);
+  return {
+    draw: false, winHand,
+    winners: entries.filter(([, h]) => h === winHand).map(([id]) => id),
+    losers:  entries.filter(([, h]) => h !== winHand).map(([id]) => id),
+  };
 }
 
-function judge(a, b) {
-  if (a === b) return 'draw';
-  if (
-    (a === 'rock' && b === 'scissors') ||
-    (a === 'scissors' && b === 'paper') ||
-    (a === 'paper' && b === 'rock')
-  ) return 'win';
-  return 'lose';
+function snap(room) {
+  return {
+    roomId: room.id, round: room.round, state: room.state, hostId: room.hostId,
+    players: room.players.map(p => ({ id: p.id, name: p.name, score: p.score, hasChosen: !!p.choice })),
+  };
 }
 
-io.on('connection', (socket) => {
-  // ルーム作成
+const bcast = (id) => { const r = rooms.get(id); if (r) io.to(id).emit('room_update', snap(r)); };
+
+function doResult(roomId) {
+  const room = rooms.get(roomId);
+  if (!room) return;
+  room.state = 'result';
+  const choices = {};
+  room.players.forEach(p => { if (p.choice) choices[p.id] = p.choice; });
+  const result = judge(choices);
+  result.winners.forEach(id => { const p = room.players.find(q => q.id === id); if (p) p.score++; });
+  io.to(roomId).emit('phase_result', { choices, result, snap: snap(room) });
+  room.round++;
+}
+
+function startRound(roomId) {
+  const room = rooms.get(roomId);
+  if (!room) return;
+  clearTimeout(room._t1); clearTimeout(room._t2);
+  room.state = 'countdown';
+  room.players.forEach(p => { p.choice = null; });
+  io.to(roomId).emit('phase_countdown', { snap: snap(room) });
+  room._t1 = setTimeout(() => {
+    const r = rooms.get(roomId);
+    if (!r || r.state !== 'countdown') return;
+    r.state = 'choosing';
+    io.to(roomId).emit('phase_choose', { snap: snap(r) });
+    r._t2 = setTimeout(() => {
+      const r2 = rooms.get(roomId);
+      if (r2 && r2.state === 'choosing') doResult(roomId);
+    }, 15000);
+  }, 3500);
+}
+
+function findRoom(sid) {
+  for (const r of rooms.values()) if (r.players.find(p => p.id === sid)) return r;
+}
+
+function doLeave(socket) {
+  const room = findRoom(socket.id);
+  if (!room) return;
+  const idx = room.players.findIndex(p => p.id === socket.id);
+  if (idx < 0) return;
+  const name = room.players[idx].name;
+  room.players.splice(idx, 1);
+  socket.leave(room.id);
+  if (room.players.length === 0) { rooms.delete(room.id); return; }
+  if (room.hostId === socket.id) room.hostId = room.players[0].id;
+  if (room.players.length < 2 && room.state !== 'lobby') {
+    clearTimeout(room._t1); clearTimeout(room._t2);
+    room.state = 'lobby';
+    room.players.forEach(p => { p.choice = null; });
+    io.to(room.id).emit('notice', `${name}が退出。人数不足のためロビーへ戻ります`);
+    bcast(room.id);
+    return;
+  }
+  io.to(room.id).emit('notice', `${name}が退出しました`);
+  bcast(room.id);
+  if (room.state === 'choosing' && room.players.every(p => p.choice)) {
+    clearTimeout(room._t2);
+    doResult(room.id);
+  }
+}
+
+io.on('connection', socket => {
   socket.on('create_room', ({ name }) => {
-    const roomId = generateRoomId();
-    rooms[roomId] = {
-      players: [{ id: socket.id, name, choice: null }],
-      round: 1,
-      scores: {}
-    };
-    rooms[roomId].scores[socket.id] = 0;
-    socket.join(roomId);
-    socket.emit('room_created', { roomId, playerIndex: 0 });
+    const id = genId();
+    rooms.set(id, { id, players: [{ id: socket.id, name, score: 0, choice: null }], state: 'lobby', round: 1, hostId: socket.id });
+    socket.join(id);
+    socket.emit('room_created', { roomId: id });
+    bcast(id);
   });
 
-  // ルーム参加
   socket.on('join_room', ({ roomId, name }) => {
-    const room = rooms[roomId];
-    if (!room) {
-      socket.emit('error', { message: 'ルームが見つかりません' });
-      return;
-    }
-    if (room.players.length >= 2) {
-      socket.emit('error', { message: 'ルームが満員です' });
-      return;
-    }
-    room.players.push({ id: socket.id, name, choice: null });
-    room.scores[socket.id] = 0;
-    socket.join(roomId);
-
-    const names = room.players.map(p => p.name);
-    io.to(roomId).emit('game_start', { names, round: room.round });
-    socket.emit('room_joined', { roomId, playerIndex: 1 });
+    const room = rooms.get(roomId?.toUpperCase());
+    if (!room) return socket.emit('join_error', 'ルームが見つかりません');
+    if (room.state !== 'lobby') return socket.emit('join_error', 'ゲームが進行中です');
+    if (room.players.length >= 8) return socket.emit('join_error', '満員です（最大8人）');
+    room.players.push({ id: socket.id, name, score: 0, choice: null });
+    socket.join(room.id);
+    socket.emit('room_joined', { roomId: room.id });
+    bcast(room.id);
   });
 
-  // 手を選択
-  socket.on('choose', ({ roomId, choice }) => {
-    const room = rooms[roomId];
-    if (!room) return;
-
-    const player = room.players.find(p => p.id === socket.id);
-    if (!player || player.choice) return;
-    player.choice = choice;
-
-    // 相手に「選択済み」を通知（手は隠す）
-    socket.to(roomId).emit('opponent_chose');
-
-    // 両者が選択済みなら勝敗判定
-    if (room.players.every(p => p.choice)) {
-      const [p0, p1] = room.players;
-      const result0 = judge(p0.choice, p1.choice);
-      const result1 = result0 === 'draw' ? 'draw' : (result0 === 'win' ? 'lose' : 'win');
-
-      if (result0 === 'win') room.scores[p0.id]++;
-      if (result1 === 'win') room.scores[p1.id]++;
-
-      io.to(roomId).emit('round_result', {
-        choices: { [p0.id]: p0.choice, [p1.id]: p1.choice },
-        results: { [p0.id]: result0, [p1.id]: result1 },
-        scores: room.scores,
-        round: room.round
-      });
-
-      room.round++;
-      room.players.forEach(p => { p.choice = null; });
-    }
+  socket.on('start_game', () => {
+    const room = findRoom(socket.id);
+    if (!room || socket.id !== room.hostId || room.state !== 'lobby') return;
+    if (room.players.length < 2) return socket.emit('join_error', '2人以上必要です');
+    startRound(room.id);
   });
 
-  // 次のラウンドへ
-  socket.on('next_round', ({ roomId }) => {
-    const room = rooms[roomId];
-    if (!room) return;
-    io.to(roomId).emit('round_start', { round: room.round });
+  socket.on('choose', ({ hand }) => {
+    const room = findRoom(socket.id);
+    if (!room || room.state !== 'choosing') return;
+    const p = room.players.find(p => p.id === socket.id);
+    if (!p || p.choice) return;
+    p.choice = hand;
+    bcast(room.id);
+    if (room.players.every(p => p.choice)) { clearTimeout(room._t2); doResult(room.id); }
   });
 
-  // 切断処理
-  socket.on('disconnect', () => {
-    for (const [roomId, room] of Object.entries(rooms)) {
-      const idx = room.players.findIndex(p => p.id === socket.id);
-      if (idx !== -1) {
-        socket.to(roomId).emit('opponent_left');
-        delete rooms[roomId];
-        break;
-      }
-    }
+  socket.on('next_round', () => {
+    const room = findRoom(socket.id);
+    if (!room || socket.id !== room.hostId || room.state !== 'result') return;
+    startRound(room.id);
   });
+
+  socket.on('leave_room', () => doLeave(socket));
+  socket.on('disconnect', () => doLeave(socket));
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`サーバー起動中: http://localhost:${PORT}`);
-});
+server.listen(PORT, () => console.log(`http://localhost:${PORT}`));
