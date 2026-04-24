@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>オンラインじゃんけん</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', 'Hiragino Sans', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 2rem;
+      margin-bottom: 8px;
+      text-shadow: 0 0 20px rgba(100, 200, 255, 0.5);
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #aaa;
+      margin-bottom: 32px;
+      font-size: 0.9rem;
+    }
+
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    .card {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 16px;
+      backdrop-filter: blur(10px);
+    }
+
+    .card h2 {
+      font-size: 1.1rem;
+      margin-bottom: 16px;
+      color: #7ec8e3;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      font-size: 1rem;
+      margin-bottom: 12px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]::placeholder { color: #888; }
+    input[type="text"]:focus { border-color: #7ec8e3; }
+
+    button {
+      width: 100%;
+      padding: 13px;
+      border-radius: 10px;
+      border: none;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #4776e6, #8e54e9);
+      color: #fff;
+    }
+
+    .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.2);
+      margin-top: 8px;
+    }
+
+    .btn-secondary:hover { background: rgba(255,255,255,0.15); }
+
+    .error-msg {
+      color: #ff7eb3;
+      font-size: 0.85rem;
+      margin-top: 8px;
+      min-height: 20px;
+    }
+
+    /* 待機画面 */
+    .room-id-display {
+      text-align: center;
+      font-size: 2.5rem;
+      font-weight: 700;
+      letter-spacing: 0.3em;
+      color: #7ec8e3;
+      padding: 20px;
+      background: rgba(126, 200, 227, 0.1);
+      border-radius: 12px;
+      margin: 16px 0;
+    }
+
+    .waiting-text {
+      text-align: center;
+      color: #aaa;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ゲーム画面 */
+    .scoreboard {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .player-score {
+      text-align: center;
+      flex: 1;
+    }
+
+    .player-score .pname {
+      font-size: 0.9rem;
+      color: #aaa;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .player-score.me .pname { color: #7ec8e3; }
+
+    .score-num {
+      font-size: 2.2rem;
+      font-weight: 700;
+    }
+
+    .vs-badge {
+      padding: 0 16px;
+      font-size: 1.2rem;
+      color: #555;
+      font-weight: 700;
+    }
+
+    .round-label {
+      text-align: center;
+      color: #888;
+      font-size: 0.85rem;
+      margin-bottom: 20px;
+    }
+
+    /* 手の選択エリア */
+    .choices {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .choice-btn {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.07);
+      font-size: 2.4rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .choice-btn:hover:not(:disabled) {
+      border-color: #7ec8e3;
+      background: rgba(126, 200, 227, 0.15);
+      transform: scale(1.1);
+    }
+
+    .choice-btn:disabled {
+      cursor: default;
+      opacity: 0.5;
+    }
+
+    .choice-btn.selected {
+      border-color: #7ec8e3;
+      background: rgba(126, 200, 227, 0.25);
+      transform: scale(1.05);
+    }
+
+    /* 結果表示 */
+    .result-area {
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .result-hands {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 24px;
+      font-size: 3.5rem;
+      margin-bottom: 16px;
+    }
+
+    .result-hand { transition: transform 0.3s; }
+    .result-hand.winner { transform: scale(1.2); }
+
+    .result-verdict {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .result-verdict.win { color: #4ade80; }
+    .result-verdict.lose { color: #f87171; }
+    .result-verdict.draw { color: #facc15; }
+
+    .status-msg {
+      text-align: center;
+      color: #aaa;
+      font-size: 0.9rem;
+      margin: 12px 0;
+      min-height: 22px;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      margin: 16px 0;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>✊ じゃんけん</h1>
+  <p class="subtitle">オンライン対戦</p>
+
+  <!-- トップ画面 -->
+  <div id="screen-top" class="screen active">
+    <div class="card">
+      <h2>名前を入力</h2>
+      <input type="text" id="input-name" placeholder="あなたの名前" maxlength="12">
+    </div>
+    <div class="card">
+      <h2>ルームを作る</h2>
+      <button class="btn-primary" onclick="createRoom()">ルームを作成する</button>
+    </div>
+    <div class="card">
+      <h2>ルームに参加</h2>
+      <input type="text" id="input-room" placeholder="ルームID（例: AB12C）" maxlength="5">
+      <button class="btn-primary" onclick="joinRoom()">参加する</button>
+    </div>
+    <p class="error-msg" id="top-error"></p>
+  </div>
+
+  <!-- 待機画面 -->
+  <div id="screen-waiting" class="screen">
+    <div class="card" style="text-align:center">
+      <h2>ルームID</h2>
+      <div class="room-id-display" id="display-room-id">-----</div>
+      <p style="color:#aaa;font-size:0.85rem;margin-bottom:16px">
+        このIDを相手に教えてください
+      </p>
+      <p class="waiting-text">相手の参加を待っています…</p>
+    </div>
+  </div>
+
+  <!-- ゲーム画面 -->
+  <div id="screen-game" class="screen">
+    <div class="card">
+      <div class="scoreboard">
+        <div class="player-score me">
+          <div class="pname" id="my-name">あなた</div>
+          <div class="score-num" id="my-score">0</div>
+        </div>
+        <div class="vs-badge">VS</div>
+        <div class="player-score">
+          <div class="pname" id="opp-name">相手</div>
+          <div class="score-num" id="opp-score">0</div>
+        </div>
+      </div>
+
+      <div class="round-label" id="round-label">第1ラウンド</div>
+      <hr class="divider">
+
+      <!-- 選択フェーズ -->
+      <div id="phase-choose">
+        <p class="status-msg">手を選んでください</p>
+        <div class="choices">
+          <button class="choice-btn" onclick="choose('rock')" title="グー">✊</button>
+          <button class="choice-btn" onclick="choose('scissors')" title="チョキ">✌️</button>
+          <button class="choice-btn" onclick="choose('paper')" title="パー">✋</button>
+        </div>
+        <p class="status-msg" id="choose-status"></p>
+      </div>
+
+      <!-- 結果フェーズ -->
+      <div id="phase-result" style="display:none">
+        <div class="result-area">
+          <div class="result-hands">
+            <span class="result-hand" id="result-my-hand">✊</span>
+            <span style="font-size:1.5rem;color:#555">VS</span>
+            <span class="result-hand" id="result-opp-hand">✊</span>
+          </div>
+          <div class="result-verdict" id="result-verdict">あいこ</div>
+        </div>
+        <button class="btn-primary" id="btn-next" onclick="nextRound()" style="display:none">
+          次のラウンドへ →
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+  let myRoomId = null;
+  let myIndex = null;  // 0 or 1
+  let myId = null;
+  let oppId = null;
+  let playerNames = [];
+  let currentRound = 1;
+  let myChoice = null;
+  let readyForNext = false;
+
+  const HAND_EMOJI = { rock: '✊', scissors: '✌️', paper: '✋' };
+  const HAND_LABEL = { rock: 'グー', scissors: 'チョキ', paper: 'パー' };
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function getName() {
+    const v = document.getElementById('input-name').value.trim();
+    if (!v) { showError('名前を入力してください'); return null; }
+    return v;
+  }
+
+  function showError(msg) {
+    document.getElementById('top-error').textContent = msg;
+  }
+
+  function createRoom() {
+    const name = getName();
+    if (!name) return;
+    socket.emit('create_room', { name });
+  }
+
+  function joinRoom() {
+    const name = getName();
+    if (!name) return;
+    const roomId = document.getElementById('input-room').value.trim().toUpperCase();
+    if (!roomId) { showError('ルームIDを入力してください'); return; }
+    socket.emit('join_room', { roomId, name });
+  }
+
+  function choose(hand) {
+    if (myChoice) return;
+    myChoice = hand;
+
+    document.querySelectorAll('.choice-btn').forEach(b => {
+      b.disabled = true;
+      if (b.title === HAND_LABEL[hand]) b.classList.add('selected');
+    });
+    document.getElementById('choose-status').textContent = `${HAND_EMOJI[hand]} ${HAND_LABEL[hand]}を選択しました。相手を待っています…`;
+
+    socket.emit('choose', { roomId: myRoomId, choice: hand });
+  }
+
+  function nextRound() {
+    readyForNext = true;
+    document.getElementById('btn-next').textContent = '待機中…';
+    document.getElementById('btn-next').disabled = true;
+    socket.emit('next_round', { roomId: myRoomId });
+  }
+
+  function startRound(round) {
+    currentRound = round;
+    myChoice = null;
+    readyForNext = false;
+
+    document.getElementById('round-label').textContent = `第${round}ラウンド`;
+    document.getElementById('phase-choose').style.display = 'block';
+    document.getElementById('phase-result').style.display = 'none';
+    document.getElementById('choose-status').textContent = '';
+
+    document.querySelectorAll('.choice-btn').forEach(b => {
+      b.disabled = false;
+      b.classList.remove('selected');
+    });
+
+    document.getElementById('btn-next').style.display = 'none';
+    document.getElementById('btn-next').disabled = false;
+    document.getElementById('btn-next').textContent = '次のラウンドへ →';
+  }
+
+  // --- Socket events ---
+
+  socket.on('room_created', ({ roomId, playerIndex }) => {
+    myRoomId = roomId;
+    myIndex = playerIndex;
+    myId = socket.id;
+    document.getElementById('display-room-id').textContent = roomId;
+    showScreen('screen-waiting');
+  });
+
+  socket.on('room_joined', ({ roomId, playerIndex }) => {
+    myRoomId = roomId;
+    myIndex = playerIndex;
+    myId = socket.id;
+  });
+
+  socket.on('game_start', ({ names, round }) => {
+    playerNames = names;
+    document.getElementById('my-name').textContent = names[myIndex] + ' (あなた)';
+    document.getElementById('opp-name').textContent = names[1 - myIndex];
+    document.getElementById('my-score').textContent = '0';
+    document.getElementById('opp-score').textContent = '0';
+    showScreen('screen-game');
+    startRound(round);
+  });
+
+  socket.on('opponent_chose', () => {
+    if (!myChoice) {
+      document.getElementById('choose-status').textContent = '相手が選択しました。あなたも選んでください。';
+    }
+  });
+
+  socket.on('round_result', ({ choices, results, scores, round }) => {
+    // IDを特定（room_joined前にgame_startが来るので socket.id使用）
+    const ids = Object.keys(choices);
+    myId = myId || ids[myIndex];
+    oppId = ids.find(id => id !== myId);
+
+    const myHand = choices[myId];
+    const oppHand = choices[oppId];
+    const myResult = results[myId];
+
+    document.getElementById('result-my-hand').textContent = HAND_EMOJI[myHand];
+    document.getElementById('result-opp-hand').textContent = HAND_EMOJI[oppHand];
+
+    const verdictEl = document.getElementById('result-verdict');
+    verdictEl.className = 'result-verdict ' + myResult;
+    verdictEl.textContent = myResult === 'win' ? '勝ち！' : myResult === 'lose' ? '負け…' : 'あいこ';
+
+    // スコア更新
+    document.getElementById('my-score').textContent = scores[myId] ?? 0;
+    document.getElementById('opp-score').textContent = scores[oppId] ?? 0;
+
+    document.getElementById('phase-choose').style.display = 'none';
+    document.getElementById('phase-result').style.display = 'block';
+    document.getElementById('btn-next').style.display = 'block';
+  });
+
+  socket.on('round_start', ({ round }) => {
+    startRound(round);
+  });
+
+  socket.on('opponent_left', () => {
+    alert('相手が退出しました。');
+    location.reload();
+  });
+
+  socket.on('error', ({ message }) => {
+    showError(message);
+  });
+
+  // Enterキーでルーム参加
+  document.getElementById('input-room').addEventListener('keydown', e => {
+    if (e.key === 'Enter') joinRoom();
+  });
+  document.getElementById('input-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('input-room').focus();
+  });
+</script>
+</body>
+</html>
